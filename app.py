@@ -72,6 +72,15 @@ Do not invent words. Do not improve grammar or punctuation beyond what's written
 
 OCR result for reference:
 """
+
+    # Upload the image to OpenAI first
+    file_response = openai.files.create(
+        file=io.BytesIO(image_bytes),
+        purpose="vision"
+    )
+    file_id = file_response.id
+
+    # Now call GPT-4 Vision with the file ID
     response = openai.chat.completions.create(
         model="gpt-4o-vision",
         messages=[
@@ -79,13 +88,14 @@ OCR result for reference:
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": "image_file", "image_file": {"file": image_bytes}}
+                    {"type": "image_file", "image_file": {"file_id": file_id}}
                 ]
             }
         ],
         max_tokens=2000,
     )
     return response.choices[0].message.content.strip()
+
 
 
 # ------------------ STREAMLIT APP ------------------
