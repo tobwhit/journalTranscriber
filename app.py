@@ -111,7 +111,7 @@ if uploaded_files and st.button("Process Files"):
          # Step 3: Optional GPT-4o Vision Check
         if use_gpt4:
             st.write(f"Correcting: {uploaded_file.name} with GPT-4o Vision...")
-            corrected_text = correct_text_with_gpt4_vision(image_bytes, raw_text)
+            corrected_text = correct_text_with_gpt4(image_bytes, raw_text)
         else:
             corrected_text = raw_text  # Trust Azure only
         # Step 4: Combine outputs
