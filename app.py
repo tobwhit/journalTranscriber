@@ -17,6 +17,21 @@ print(AZURE_ENDPOINT)
 # Azure Configuration
 OCR_URL = AZURE_ENDPOINT + "vision/v3.2/read/analyze/"
 
+def compress_image_to_bytes(uploaded_file, max_size_kb=4000):
+    img = Image.open(uploaded_file)
+    img = img.convert("RGB")
+
+    output = io.BytesIO()
+    quality = 85
+    img.save(output, format="JPEG", quality=quality)
+    while output.tell() > max_size_kb * 1024 and quality > 10:
+        output = io.BytesIO()
+        quality -= 5
+        img.save(output, format="JPEG", quality=quality)
+
+    output.seek(0)
+    return output.read()
+    
 def extract_handwritten_text(image_bytes):
     headers = {
         "Ocp-Apim-Subscription-Key": AZURE_KEY,
@@ -63,7 +78,7 @@ if uploaded_files and st.button("Process Files"):
     all_clean_text = ""
     progress_bar = st.progress(0)
     for idx, uploaded_file in enumerate(uploaded_files):
-        image_bytes = uploaded_file.read()
+        image_bytes = compress_image_to_bytes(uploaded_file)
         raw_text = extract_handwritten_text(image_bytes)
         cleaned_text = clean_text_with_gpt4(raw_text)
         all_clean_text += f"# {uploaded_file.name}\n\n{cleaned_text}\n\n---\n\n"
