@@ -70,7 +70,7 @@ def image_to_base64_url(image_bytes):
 
 
 # ------------------ GPT-4o VISION CLEANUP ------------------
-def correct_text_with_gpt4_vision(image_bytes, raw_text):
+def correct_text_with_gpt4(image_bytes, raw_text):
     image_url = image_to_base64_url(image_bytes)
 
     prompt = f"""You are a transcription expert. Below is the OCR result from the image. Your task is to carefully review the handwritten image and rewrite the transcription accurately. Correct any OCR mistakes. Only transcribe what is visibly written in the image. Do not invent words. Do not improve grammar or punctuation beyond what's written. OCR result for reference: /n/n{raw_text}"""
@@ -94,6 +94,7 @@ def correct_text_with_gpt4_vision(image_bytes, raw_text):
 # ------------------ STREAMLIT APP ------------------
 st.title("Journal Transcriber (Azure OCR + GPT-4o Review)")
 
+use_gpt4 = st.sidebar.checkbox("Use GPT-4o Vision to verify and correct Azure OCR?", value=True)
 uploaded_files = st.file_uploader("Upload your handwritten journal images (JPEG, PNG)", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
 if uploaded_files and st.button("Process Files"):
@@ -107,10 +108,12 @@ if uploaded_files and st.button("Process Files"):
         # Step 2: Azure OCR
         raw_text = extract_handwritten_text(image_bytes)
 
-        
-        st.write(f"Correcting: {uploaded_file.name} with GPT-4o...")
-        corrected_text = correct_text_with_gpt4_vision(image_bytes, raw_text)
-
+         # Step 3: Optional GPT-4o Vision Check
+        if use_gpt4:
+            st.write(f"Correcting: {uploaded_file.name} with GPT-4o Vision...")
+            corrected_text = correct_text_with_gpt4_vision(image_bytes, raw_text)
+        else:
+            corrected_text = raw_text  # Trust Azure only
         # Step 4: Combine outputs
         all_clean_text += f"# {uploaded_file.name}\n\n{corrected_text}\n\n---\n\n"
         progress_bar.progress((idx + 1) / len(uploaded_files))
