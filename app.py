@@ -12,7 +12,7 @@ load_dotenv()
 AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT")
 AZURE_KEY = os.getenv("AZURE_KEY")
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
+print(AZURE_ENDPOINT)
 
 # Azure Configuration
 OCR_URL = AZURE_ENDPOINT + "vision/v3.2/read/analyze"
