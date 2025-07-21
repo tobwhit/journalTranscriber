@@ -9,10 +9,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT")
+AZURE_KEY = os.getenv("AZURE_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 
 # Azure Configuration
-AZURE_ENDPOINT = "https://your-azure-endpoint.cognitiveservices.azure.com"
-AZURE_KEY = "your-azure-key"
 OCR_URL = AZURE_ENDPOINT.rstrip("/") + "/vision/v3.2/read/analyze"
 
 def extract_handwritten_text(image_bytes):
