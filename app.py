@@ -8,10 +8,6 @@ from PIL import Image
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
-import os
-from dotenv import load_dotenv
-load_dotenv()
 
 AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT")
 AZURE_KEY = os.getenv("AZURE_KEY")
