@@ -73,13 +73,7 @@ def image_to_base64_url(image_bytes):
 def correct_text_with_gpt4_vision(image_bytes, raw_text):
     image_url = image_to_base64_url(image_bytes)
 
-    prompt = f"""You are a transcription expert. Below is the OCR result from the image. 
-Your task is to carefully review the handwritten image and rewrite the transcription accurately.
-Correct any OCR mistakes. Only transcribe what is visibly written in the image.
-Do not invent words. Do not improve grammar or punctuation beyond what's written.
-
-OCR result for reference:
-"""
+    prompt = f"""You are a transcription expert. Below is the OCR result from the image. Your task is to carefully review the handwritten image and rewrite the transcription accurately. Correct any OCR mistakes. Only transcribe what is visibly written in the image. Do not invent words. Do not improve grammar or punctuation beyond what's written. OCR result for reference: /n/n{raw_text}"""
 
     response = openai.chat.completions.create(
         model="gpt-4o",
