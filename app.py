@@ -19,7 +19,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 # Azure Configuration
-OCR_URL = AZURE_ENDPOINT.rstrip("/") + "vision/v3.2/read/analyze"
+OCR_URL = AZURE_ENDPOINT + "vision/v3.2/read/analyze"
 
 def extract_handwritten_text(image_bytes):
     headers = {
