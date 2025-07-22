@@ -20,7 +20,7 @@ def image_to_base64_url(image_bytes):
 def transcribe_with_gpt4_vision(image_bytes):
     image_url = image_to_base64_url(image_bytes)
 
-    prompt = """You are a transcription expert. Carefully review this handwritten image and transcribe the text exactly as it appears. Do not invent words. Don't create context for the pictures. Keep original spelling and punctuation, even if incorrect. If you cannot read a word, write [illegible].
+    prompt = """You are a transcription expert. Carefully review this handwritten image and transcribe the text exactly as it appears. Do not invent words. Don't create context for the pictures. Keep original spelling and punctuation, even if incorrect. If you cannot read a word, write [illegible]. You may have to rotate the pictures to be upright.
 
 Output only the transcription with no explanation or additional commentary."""
 
