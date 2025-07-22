@@ -42,7 +42,7 @@ Output only the transcription with no explanation or additional commentary."""
 
 # ------------------ GPT-4o SELF-REVIEW ------------------
 def review_transcription_with_gpt4(original_transcription):
-    prompt = f"""You are reviewing the following handwritten transcription for accuracy. Correct any obvious mistakes, improve formatting for readability, and ensure it matches the likely intent of the original handwriting. Do not invent words. Keep it as close to the original handwriting as possible.
+    prompt = f"""You are reviewing the following handwritten transcription for accuracy. Correct any obvious mistakes. Do not invent words. Keep it as close to the original handwriting as possible.
 
 Original transcription:
 {original_transcription}
