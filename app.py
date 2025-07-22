@@ -14,7 +14,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Google Cloud Vision - load credentials from Streamlit Secrets
-credentials_info = st.secrets["gcp_service_account"]
+credentials_info = st.secrets["type"]
 google_credentials = service_account.Credentials.from_service_account_info(credentials_info)
 vision_client = vision.ImageAnnotatorClient(credentials=google_credentials)
 # ----------------------------------------------------
