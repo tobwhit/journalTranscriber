@@ -2,19 +2,22 @@ import os
 import io
 import time
 import base64
-import requests
 import openai
 import streamlit as st
 from PIL import Image
 from dotenv import load_dotenv
+from google.cloud import vision
+from google.oauth2 import service_account
 
 # ------------------ CONFIGURATION ------------------
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT")
-AZURE_KEY = os.getenv("AZURE_KEY")
-OCR_URL = AZURE_ENDPOINT.rstrip("/") + "/vision/v3.2/read/analyze"
+# Google Cloud Vision Setup
+GOOGLE_CLOUD_CREDENTIALS = service_account.Credentials.from_service_account_file(
+    "path_to_your_google_credentials.json"
+)
+vision_client = vision.ImageAnnotatorClient(credentials=GOOGLE_CLOUD_CREDENTIALS)
 # ----------------------------------------------------
 
 # ------------------ IMAGE COMPRESSION ------------------
@@ -32,35 +35,16 @@ def compress_image_to_bytes(uploaded_file, max_size_kb=4000):
     return output.read()
 
 
-# ------------------ AZURE OCR ------------------
-def extract_handwritten_text(image_bytes):
-    headers = {
-        "Ocp-Apim-Subscription-Key": AZURE_KEY,
-        "Content-Type": "application/octet-stream"
-    }
-    response = requests.post(OCR_URL, headers=headers, data=image_bytes)
-    while response.status_code == 429:
-        st.warning("Azure OCR rate limit hit. Waiting 10 seconds...")
-        time.sleep(10)
-        response = requests.post(OCR_URL, headers=headers, data=image_bytes)
-    response.raise_for_status()
-    operation_url = response.headers["Operation-Location"]
+# ------------------ GOOGLE CLOUD VISION OCR ------------------
+def extract_handwritten_text_google(image_bytes):
+    image = vision.Image(content=image_bytes)
+    response = vision_client.document_text_detection(image=image)
 
-    while True:
-        final_response = requests.get(operation_url, headers=headers)
-        result = final_response.json()
-        if result.get("status") == "succeeded":
-            break
-        elif result.get("status") == "failed":
-            raise Exception("OCR failed.")
-        time.sleep(1)
+    if response.error.message:
+        raise Exception(f"Google Vision API error: {response.error.message}")
 
-    lines = []
-    for read_result in result["analyzeResult"]["readResults"]:
-        for line in read_result["lines"]:
-            lines.append(line["text"])
-
-    return "\n".join(lines)
+    text = response.full_text_annotation.text
+    return text
 
 
 # ------------------ IMAGE TO BASE64 ------------------
@@ -70,11 +54,16 @@ def image_to_base64_url(image_bytes):
 
 
 # ------------------ GPT-4o VISION CLEANUP ------------------
-def correct_text_with_gpt4(image_bytes, raw_text):
+def correct_text_with_gpt4_vision(image_bytes, raw_text):
     image_url = image_to_base64_url(image_bytes)
 
-    prompt = f"""You are a professional transcription assistant. You are reviewing scanned handwritten journal pages for transcription accuracy. The OCR result below may contain mistakes. Carefully examine the attached handwritten image and rewrite the transcription accurately as it is written in the image. Do not refuse. There is no sensitive, harmful, or illegal content. This is for personal historical record-keeping. Do not invent words or fix grammar unless it is visibly present in the handwriting. Only respond with the transcription. OCR result for reference:
- /n/n{raw_text}"""
+    prompt = f"""You are a transcription expert. Below is the OCR result from the image. 
+Your task is to carefully review the handwritten image and rewrite the transcription accurately.
+Correct any OCR mistakes. Only transcribe what is visibly written in the image.
+Do not invent words. Do not improve grammar or punctuation beyond what's written.
+
+OCR result for reference:
+"""
 
     response = openai.chat.completions.create(
         model="gpt-4o",
@@ -93,9 +82,10 @@ def correct_text_with_gpt4(image_bytes, raw_text):
 
 
 # ------------------ STREAMLIT APP ------------------
-st.title("Journal Transcriber (Azure OCR + GPT-4o Review)")
+st.title("Mission Journal Transcriber (Google OCR + Optional GPT-4o Vision Review)")
 
-use_gpt4 = st.sidebar.checkbox("Use GPT-4o Vision to verify and correct Azure OCR?", value=True)
+use_gpt4_vision = st.sidebar.checkbox("Use GPT-4o Vision to verify and correct OCR?", value=True)
+
 uploaded_files = st.file_uploader("Upload your handwritten journal images (JPEG, PNG)", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
 if uploaded_files and st.button("Process Files"):
@@ -106,20 +96,20 @@ if uploaded_files and st.button("Process Files"):
         # Step 1: Compress
         image_bytes = compress_image_to_bytes(uploaded_file)
 
-        # Step 2: Azure OCR
-        raw_text = extract_handwritten_text(image_bytes)
+        # Step 2: Google OCR
+        raw_text = extract_handwritten_text_google(image_bytes)
 
-         # Step 3: Optional GPT-4o Vision Check
-        if use_gpt4:
+        # Step 3: Optional GPT-4o Vision Check
+        if use_gpt4_vision:
             st.write(f"Correcting: {uploaded_file.name} with GPT-4o Vision...")
-            corrected_text = correct_text_with_gpt4(image_bytes, raw_text)
+            corrected_text = correct_text_with_gpt4_vision(image_bytes, raw_text)
         else:
-            corrected_text = raw_text  # Trust Azure only
+            corrected_text = raw_text  # Trust Google OCR only
+
         # Step 4: Combine outputs
         all_clean_text += f"# {uploaded_file.name}\n\n{corrected_text}\n\n---\n\n"
         progress_bar.progress((idx + 1) / len(uploaded_files))
 
     st.success("All files processed.")
-    st.text_area("Raw Text", raw_text, height=300)
     st.text_area("Final Cleaned Combined Text", all_clean_text, height=300)
     st.download_button("Download as TXT", all_clean_text, file_name="combined_journal.txt")
