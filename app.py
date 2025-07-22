@@ -2,23 +2,20 @@ import os
 import io
 import time
 import base64
+import requests
 import openai
 import streamlit as st
 from PIL import Image
 from dotenv import load_dotenv
-from google.cloud import vision
-from google.oauth2 import service_account
 
 # ------------------ CONFIGURATION ------------------
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Google Cloud Vision - load credentials from Streamlit Secrets
-credentials_info = st.secrets["gcp_service_account"]
-google_credentials = service_account.Credentials.from_service_account_info(credentials_info)
-vision_client = vision.ImageAnnotatorClient(credentials=google_credentials)
+AZURE_ENDPOINT = os.getenv("AZURE_ENDPOINT")
+AZURE_KEY = os.getenv("AZURE_KEY")
+OCR_URL = AZURE_ENDPOINT.rstrip("/") + "/vision/v3.2/read/analyze"
 # ----------------------------------------------------
-
 
 # ------------------ IMAGE COMPRESSION ------------------
 def compress_image_to_bytes(uploaded_file, max_size_kb=4000):
@@ -35,16 +32,35 @@ def compress_image_to_bytes(uploaded_file, max_size_kb=4000):
     return output.read()
 
 
-# ------------------ GOOGLE CLOUD VISION OCR ------------------
-def extract_handwritten_text_google(image_bytes):
-    image = vision.Image(content=image_bytes)
-    response = vision_client.document_text_detection(image=image)
+# ------------------ AZURE OCR ------------------
+def extract_handwritten_text(image_bytes):
+    headers = {
+        "Ocp-Apim-Subscription-Key": AZURE_KEY,
+        "Content-Type": "application/octet-stream"
+    }
+    response = requests.post(OCR_URL, headers=headers, data=image_bytes)
+    while response.status_code == 429:
+        st.warning("Azure OCR rate limit hit. Waiting 10 seconds...")
+        time.sleep(10)
+        response = requests.post(OCR_URL, headers=headers, data=image_bytes)
+    response.raise_for_status()
+    operation_url = response.headers["Operation-Location"]
 
-    if response.error.message:
-        raise Exception(f"Google Vision API error: {response.error.message}")
+    while True:
+        final_response = requests.get(operation_url, headers=headers)
+        result = final_response.json()
+        if result.get("status") == "succeeded":
+            break
+        elif result.get("status") == "failed":
+            raise Exception("OCR failed.")
+        time.sleep(1)
 
-    text = response.full_text_annotation.text
-    return text
+    lines = []
+    for read_result in result["analyzeResult"]["readResults"]:
+        for line in read_result["lines"]:
+            lines.append(line["text"])
+
+    return "\n".join(lines)
 
 
 # ------------------ IMAGE TO BASE64 ------------------
@@ -83,9 +99,9 @@ OCR result for reference:
 
 
 # ------------------ STREAMLIT APP ------------------
-st.title("Mission Journal Transcriber (Google OCR + Optional GPT-4o Vision Review)")
+st.title("Mission Journal Transcriber (Azure OCR + Optional GPT-4o Vision Review)")
 
-use_gpt4_vision = st.sidebar.checkbox("Use GPT-4o Vision to verify and correct OCR?", value=True)
+use_gpt4_vision = st.sidebar.checkbox("Use GPT-4o Vision to verify and correct Azure OCR?", value=True)
 
 uploaded_files = st.file_uploader("Upload your handwritten journal images (JPEG, PNG)", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
@@ -97,15 +113,15 @@ if uploaded_files and st.button("Process Files"):
         # Step 1: Compress
         image_bytes = compress_image_to_bytes(uploaded_file)
 
-        # Step 2: Google OCR
-        raw_text = extract_handwritten_text_google(image_bytes)
+        # Step 2: Azure OCR
+        raw_text = extract_handwritten_text(image_bytes)
 
         # Step 3: Optional GPT-4o Vision Check
         if use_gpt4_vision:
             st.write(f"Correcting: {uploaded_file.name} with GPT-4o Vision...")
             corrected_text = correct_text_with_gpt4_vision(image_bytes, raw_text)
         else:
-            corrected_text = raw_text  # Trust Google OCR only
+            corrected_text = raw_text  # Trust Azure only
 
         # Step 4: Combine outputs
         all_clean_text += f"# {uploaded_file.name}\n\n{corrected_text}\n\n---\n\n"
