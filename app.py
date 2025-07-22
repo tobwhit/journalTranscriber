@@ -13,12 +13,12 @@ from google.oauth2 import service_account
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Google Cloud Vision Setup
-GOOGLE_CLOUD_CREDENTIALS = service_account.Credentials.from_service_account_file(
-    "path_to_your_google_credentials.json"
-)
-vision_client = vision.ImageAnnotatorClient(credentials=GOOGLE_CLOUD_CREDENTIALS)
+# Google Cloud Vision - load credentials from Streamlit Secrets
+credentials_info = st.secrets["gcp_service_account"]
+google_credentials = service_account.Credentials.from_service_account_info(credentials_info)
+vision_client = vision.ImageAnnotatorClient(credentials=google_credentials)
 # ----------------------------------------------------
+
 
 # ------------------ IMAGE COMPRESSION ------------------
 def compress_image_to_bytes(uploaded_file, max_size_kb=4000):
@@ -63,6 +63,7 @@ Correct any OCR mistakes. Only transcribe what is visibly written in the image.
 Do not invent words. Do not improve grammar or punctuation beyond what's written.
 
 OCR result for reference:
+{raw_text}
 """
 
     response = openai.chat.completions.create(
